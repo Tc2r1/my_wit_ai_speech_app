@@ -156,15 +156,18 @@ public class MainActivity extends AppCompatActivity {
 
                     Intent intent = new Intent(Intent.ACTION_WEB_SEARCH);
                     intent.putExtra(SearchManager.QUERY, searchQuery);
+
+                    responseText = "beginning Search For " + searchQuery;
+                    textToSpeech.speak(responseText, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
                     startActivity(intent);
                     break;
 
-                case "wit/create_alarm":
+                case "wit$create_alarm":
                     // https://developer.android.com/guide/components/intents-common#Clock
                     JSONObject alarmEntity = getMostConfident((data.getJSONObject("entities")).getJSONArray("wit$datetime:datetime"));
                     String timeOfDay = (String) alarmEntity.get("value");
 
-                    DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.ENGLISH);
+                    DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZZZZZ", Locale.ENGLISH);
                     DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("dd-MM-yyy hh:mm:ss a", Locale.ENGLISH);
 
                     LocalDateTime dateTime = LocalDateTime.parse(timeOfDay, inputFormatter);
@@ -172,10 +175,17 @@ public class MainActivity extends AppCompatActivity {
                     String formattedDate = outputFormatter.format(dateTime);
                     System.out.println(formattedDate);
 
-                    Intent alarmIntent = new Intent(AlarmClock.ACTION_SET_ALARM).putExtra(AlarmClock.EXTRA_HOUR, dateTime.getHour()).putExtra(AlarmClock.EXTRA_MINUTES, dateTime.getMinute());
-                    if(alarmIntent.resolveActivity(getPackageManager()) != null) {
-                        startActivity(alarmIntent);
-                    }
+                    Intent alarmIntent = new Intent(AlarmClock.ACTION_SET_ALARM)
+                                                 .putExtra(AlarmClock.EXTRA_HOUR, dateTime.getHour())
+                                                 .putExtra(AlarmClock.EXTRA_MINUTES, dateTime.getMinute());
+
+                    responseText = "Setting Alarm for" + dateTime.toLocalTime().toString();
+                    textToSpeech.speak(responseText, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
+
+                    startActivity(alarmIntent);
+
+
+                    break;
 
 
                 default:
@@ -321,7 +331,7 @@ public class MainActivity extends AppCompatActivity {
                     if(CLIENT_ACCESS_TOKEN == "<YOUR CLIENT ACCESS TOKEN>") {
                         textToSpeech.speak("Hi! Before we start the demo. Please set the client access token.", TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
                     } else {
-                        textToSpeech.speak("Hi! Welcome to the Wit a.i. voice demo. My name is Wit. What is your name?", TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
+                        textToSpeech.speak("Hi, I am azure, how may I assist blu?", TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
                     }
                     speechTranscription.setHint("Press Speak and say something!");
                     speakButton.setEnabled(true);
@@ -340,7 +350,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void requestPermissions() {
-        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.INTERNET, Manifest.permission.RECORD_AUDIO}, 1000);
+        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.INTERNET, Manifest.permission.RECORD_AUDIO, Manifest.permission.SET_ALARM}, 1000);
     }
 
     private boolean checkPermissionsFromDevice() {
