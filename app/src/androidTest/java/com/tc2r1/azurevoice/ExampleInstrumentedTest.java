@@ -1,5 +1,4 @@
-/* Copyright (c) Facebook, Inc. and its affiliates. */
-package com.facebook.witai.voicedemo;
+package com.tc2r1.azurevoice;
 
 import android.content.Context;
 
@@ -23,6 +22,6 @@ public class ExampleInstrumentedTest {
         // Context of the app under test.
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
 
-        assertEquals("com.facebook.witai.voicedemo", appContext.getPackageName());
+        assertEquals("com.tc2r1.azurevoice", appContext.getPackageName());
     }
 }

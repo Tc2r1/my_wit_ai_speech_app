@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Copyright (c) Facebook, Inc. and its affiliates. -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.tc2r1.azurevoice">
 
     <!-- Added permissions -->
     <uses-permission android:name="android.permission.INTERNET" />

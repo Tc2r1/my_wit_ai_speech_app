@@ -1,4 +1,4 @@
-package com.facebook.witai.voicedemo;
+package com.tc2r1.azurevoice;
 
 import android.Manifest;
 import android.app.SearchManager;
@@ -11,14 +11,18 @@ import android.media.AudioRecord;
 import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.provider.AlarmClock;
+import android.provider.MediaStore;
 import android.speech.tts.TextToSpeech;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+
+import com.tc2r1.azurevoice.databinding.ActivityMainBinding;
 
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
@@ -27,10 +31,8 @@ import org.json.JSONObject;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Date;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -43,10 +45,13 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 import okio.BufferedSink;
 
+
 public class MainActivity extends AppCompatActivity {
     private Button speakButton;
     private TextView speechTranscription;
     private TextToSpeech textToSpeech;
+
+    private ActivityMainBinding binding;
 
     private OkHttpClient httpClient;
     private HttpUrl.Builder httpBuilder;
@@ -67,13 +72,15 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        binding = ActivityMainBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
+
+        speakButton = binding.speakBtn;
+        speechTranscription = binding.speechTranscriptTV;
 
         if(!checkPermissionsFromDevice()) {requestPermissions();}
 
         // Get a reference to the TextView and Button from the UI
-        speechTranscription = findViewById(R.id.speechTranscription);
-        speakButton = findViewById(R.id.speakButton);
 
         // Initialize TextToSpeech
         initializeTextToSpeech(this.getApplicationContext());
@@ -103,99 +110,111 @@ public class MainActivity extends AppCompatActivity {
     // See here for shape of the response: https://wit.ai/docs/http#get__message_link
     private void respondToUser(String response) {
         Log.v("respondToUser", response);
-        String intentName = "";
-        String speakerName = null;
-        String responseText = "";
-        JSONObject data = null;
+        String witIntentName = "";
+        String witResponseText;
+        String querySubject;
+        Intent andIntent;
+        JSONObject witDataObject = null;
 
         try {
             // Parse the intent name from the Wit.ai response
-            data = new JSONObject(response);
+            witDataObject = new JSONObject(response);
 
             // Update the TextView with the voice transcription
             // Run it on the MainActivity's UI thread since it's the owner
-            final String utterance = data.getString("text");
+            final String witUtterance = witDataObject.getString("text");
             MainActivity.this.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    speechTranscription.setText(utterance);
+                    speechTranscription.setText(witUtterance);
                 }
             });
 
             // Get most confident intent
-            JSONObject intent = getMostConfident(data.getJSONArray("intents"));
+            JSONObject intent = getMostConfident(witDataObject.getJSONArray("intents"));
             if(intent == null) {
                 textToSpeech.speak("Sorry, I didn't get that. What is your name?", TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
                 return;
             }
-            intentName = intent.getString("name");
-            Log.v("respondToUser", intentName);
+            witIntentName = intent.getString("name");
+            Log.v("respondToUser", witIntentName);
         } catch(JSONException e) {
             e.printStackTrace();
         }
 
-        try {
-            // Handle intents
-            switch(intentName) {
-                case "greetings_intent":
-                    // Parse and get the most confident entity value for the name
-                    JSONObject nameEntity = getMostConfident((data.getJSONObject("entities")).getJSONArray("wit$contact:contact"));
-                    speakerName = (String) nameEntity.get("value");
+        // Handle intents
+        switch(witIntentName) {
+            case "greetings_intent":
+                // Parse and get the most confident entity value for the name
+                querySubject = getEntityValue(witDataObject, "wit$contact:contact");
 
-                    Log.v("respondToUser", speakerName);
+                Log.v("respondToUser", querySubject);
 
-                    responseText = speakerName != null ? "Nice to meet you " + speakerName : "Nice to meet you";
-                    textToSpeech.speak(responseText, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
-                    break;
+                witResponseText = "Nice to meet you " + querySubject;
+                textToSpeech.speak(witResponseText, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
 
-                case "search_intent":
-                    JSONObject searchQueryEntity = getMostConfident((data.getJSONObject("entities")).getJSONArray("wit$search:search"));
-                    String searchQuery = (String) searchQueryEntity.get("value");
+                break;
+            case "search_intent":
+                querySubject = getEntityValue(witDataObject, "wit$search:search");
 
-                    Log.v("respondToUser", "Searched For: " + searchQuery);
+                Log.v("respondToUser", "Searched For: " + querySubject);
 
-                    Intent intent = new Intent(Intent.ACTION_WEB_SEARCH);
-                    intent.putExtra(SearchManager.QUERY, searchQuery);
+                andIntent = new Intent(Intent.ACTION_WEB_SEARCH);
+                andIntent.putExtra(SearchManager.QUERY, querySubject);
 
-                    responseText = "beginning Search For " + searchQuery;
-                    textToSpeech.speak(responseText, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
-                    startActivity(intent);
-                    break;
+                witResponseText = "beginning Search For " + querySubject;
+                textToSpeech.speak(witResponseText, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
+                startActivity(andIntent);
 
-                case "wit$create_alarm":
-                    // https://developer.android.com/guide/components/intents-common#Clock
-                    JSONObject alarmEntity = getMostConfident((data.getJSONObject("entities")).getJSONArray("wit$datetime:datetime"));
-                    String timeOfDay = (String) alarmEntity.get("value");
+                break;
+            case "wit$create_alarm":
+                // https://developer.android.com/guide/components/intents-common#Clock
+                querySubject = getEntityValue(witDataObject, "wit$datetime:datetime");
 
-                    DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZZZZZ", Locale.ENGLISH);
-                    DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("dd-MM-yyy hh:mm:ss a", Locale.ENGLISH);
+                DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZZZZZ", Locale.ENGLISH);
+                DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("dd-MM-yyy hh:mm:ss a", Locale.ENGLISH);
 
-                    LocalDateTime dateTime = LocalDateTime.parse(timeOfDay, inputFormatter);
+                LocalDateTime dateTime = LocalDateTime.parse(querySubject, inputFormatter);
 
-                    String formattedDate = outputFormatter.format(dateTime);
-                    System.out.println(formattedDate);
+                String formattedDate = outputFormatter.format(dateTime);
+                System.out.println(formattedDate);
 
-                    Intent alarmIntent = new Intent(AlarmClock.ACTION_SET_ALARM)
-                                                 .putExtra(AlarmClock.EXTRA_HOUR, dateTime.getHour())
-                                                 .putExtra(AlarmClock.EXTRA_MINUTES, dateTime.getMinute());
+                andIntent = new Intent(AlarmClock.ACTION_SET_ALARM)
+                                             .putExtra(AlarmClock.EXTRA_HOUR, dateTime.getHour())
+                                             .putExtra(AlarmClock.EXTRA_MINUTES, dateTime.getMinute());
 
-                    responseText = "Setting Alarm for" + dateTime.toLocalTime().toString();
-                    textToSpeech.speak(responseText, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
+                witResponseText = "Setting Alarm for" + dateTime.toLocalTime().toString();
+                textToSpeech.speak(witResponseText, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
+                startActivity(andIntent);
 
-                    startActivity(alarmIntent);
+                break;
+            case "wit$play":
+                querySubject = getEntityValue(witDataObject, "wit$creative_work:creative_work");
 
+                andIntent = new Intent(MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH);
+                andIntent.putExtra(SearchManager.QUERY, querySubject);
+                startActivity(andIntent);
 
-                    break;
-
-
-                default:
-                    // If there is no matching intent, let the user know and ask them to try again
-                    textToSpeech.speak("What did you say is your name?", TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
-                    break;
-            }
-        } catch(JSONException e) {
-            Log.d("Json Error:", e.getMessage());
+                break;
+            default:
+                // If there is no matching intent, let the user know and ask them to try again
+                textToSpeech.speak("What did you say is your name?", TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
+                break;
         }
+    }
+
+    @NonNull
+    private String getEntityValue(JSONObject witDataObject, String name){
+        JSONObject entity;
+        String querySubject = "";
+        try {
+            entity = getMostConfident((witDataObject.getJSONObject("entities")).getJSONArray(name));
+            querySubject = (String) entity.get("value");
+
+        } catch(JSONException e) {
+            Log.d("Wit.Ai", e.getMessage());
+        }
+        return querySubject;
     }
 
     // Get the resolved intent or entity with the highest confidence from Wit Speech API

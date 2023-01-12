@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Copyright (c) Facebook, Inc. and its affiliates. -->
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -8,7 +7,7 @@
     tools:context=".MainActivity">
 
     <TextView
-        android:id="@+id/speechTranscription"
+        android:id="@+id/speechTranscriptTV"
         android:hint="Speech transcription will appear here"
         android:textSize="28sp"
         android:textAlignment="center"
@@ -22,7 +21,7 @@
         app:layout_constraintVertical_bias="0.207" />
 
     <Button
-        android:id="@+id/speakButton"
+        android:id="@+id/speakBtn"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:padding="12dp"
